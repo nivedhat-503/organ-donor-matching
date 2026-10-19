@@ -2,44 +2,28 @@ import javax.swing.*;
 import javax.swing.table.*;
 import java.awt.*;
 import java.awt.event.*;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
-import java.util.Arrays;
+import java.util.Comparator;
 import java.util.List;
 
-/**
- * ModernGUI - a fresh Swing front end with a sidebar layout.
- *
- * All data access goes through the small Backend interface below.
- * DemoBackend (in-memory sample data) lets the window run without a database.
- * To connect your real project, implement Backend using MatchService (see ServiceBackend
- * at the bottom of this file) and change the one line marked  <<< SWITCH BACKEND HERE.
- */
 public class ModernGUI extends JFrame {
 
-    // ------------------------------------------------------------------ backend contract
     interface Backend {
         List<String> bloodGroups();
         List<String> organs();
         void registerDonor(String name, int age, String bloodGroup, String organ, String city) throws Exception;
         void registerRecipient(String name, int age, String bloodGroup, String organ, int urgency, String city) throws Exception;
-        /** rows: id, name, age, blood group, organ, urgency, city, days waiting */
         List<Object[]> waitingList();
-        /** rows: id, name, blood group, organ, city */
         List<Object[]> availableDonors();
-        /** rows: rank, recipient id, name, blood group, urgency, days waiting, score */
         List<Object[]> findMatches(int donorId) throws Exception;
         void confirmMatch(int donorId, int recipientId) throws Exception;
-        /** rows: donor name, recipient name, organ, date */
         List<Object[]> history();
-        /** availableDonors, recipientsWaiting, matchesMade, averageWaitDays */
         int[] stats();
     }
 
-    // ------------------------------------------------------------------ theme
     static final Color SIDEBAR = new Color(0x1F2937);
-    static final Color SIDEBAR_HOVER = new Color(0x374151);
     static final Color ACCENT = new Color(0x0F766E);
-    static final Color ACCENT_DARK = new Color(0x115E59);
     static final Color BG = new Color(0xF3F4F6);
     static final Color CARD = Color.WHITE;
     static final Color TEXT = new Color(0x111827);
@@ -79,17 +63,25 @@ public class ModernGUI extends JFrame {
 
         status.setFont(BASE.deriveFont(12f));
         status.setForeground(MUTED);
-        status.setBorder(BorderFactory.createCompoundBorder(
-                BorderFactory.createMatteBorder(1, 0, 0, 0, LINE), BorderFactory.createEmptyBorder(6, 12, 6, 12)));
-        status.setOpaque(true);
-        status.setBackground(CARD);
-        root.add(status, BorderLayout.SOUTH);
+        status.setBorder(BorderFactory.createEmptyBorder(4, 12, 4, 12));
+        JLabel disclaimer = new JLabel("Educational demo with fictional data. Not for real medical or allocation decisions.");
+        disclaimer.setFont(BASE.deriveFont(12f));
+        disclaimer.setForeground(MUTED);
+        disclaimer.setBorder(BorderFactory.createEmptyBorder(4, 12, 4, 12));
+
+        JPanel footer = new JPanel(new BorderLayout());
+        footer.setBackground(CARD);
+        footer.setBorder(BorderFactory.createMatteBorder(1, 0, 0, 0, LINE));
+        footer.add(status, BorderLayout.WEST);
+        footer.add(disclaimer, BorderLayout.EAST);
+        root.add(footer, BorderLayout.SOUTH);
 
         setContentPane(root);
         show("Dashboard");
     }
 
-    // ------------------------------------------------------------------ navigation
+    // sidebar and page switching
+
     private JComponent buildSidebar() {
         JPanel side = new JPanel();
         side.setLayout(new BoxLayout(side, BoxLayout.Y_AXIS));
@@ -101,15 +93,8 @@ public class ModernGUI extends JFrame {
         brand.setFont(BASE.deriveFont(Font.BOLD, 20f));
         brand.setForeground(Color.WHITE);
         brand.setAlignmentX(Component.LEFT_ALIGNMENT);
-        brand.setBorder(BorderFactory.createEmptyBorder(0, 8, 4, 0));
+        brand.setBorder(BorderFactory.createEmptyBorder(0, 8, 24, 0));
         side.add(brand);
-
-        JLabel sub = new JLabel("Donor & recipient matching");
-        sub.setFont(BASE.deriveFont(12f));
-        sub.setForeground(new Color(0x9CA3AF));
-        sub.setAlignmentX(Component.LEFT_ALIGNMENT);
-        sub.setBorder(BorderFactory.createEmptyBorder(0, 8, 24, 0));
-        side.add(sub);
 
         for (final String name : new String[]{"Dashboard", "Register Donor", "Register Recipient",
                 "Waiting List", "Find Match", "History"}) {
@@ -153,7 +138,8 @@ public class ModernGUI extends JFrame {
 
     private void say(String msg) { status.setText(" " + msg); }
 
-    // ------------------------------------------------------------------ shared widgets
+    // helpers
+
     private static JPanel page(String title, String hint) {
         JPanel p = new JPanel(new BorderLayout(0, 16));
         p.setBackground(BG);
@@ -228,7 +214,20 @@ public class ModernGUI extends JFrame {
         t.setGridColor(LINE);
         t.setSelectionBackground(new Color(0xCCFBF1));
         t.setSelectionForeground(TEXT);
-        t.setAutoCreateRowSorter(true);
+
+        // without this, 10 sorts before 9
+        TableRowSorter<DefaultTableModel> sorter = new TableRowSorter<DefaultTableModel>(m);
+        Comparator<Object> cmp = new Comparator<Object>() {
+            public int compare(Object a, Object b) {
+                if (a instanceof Number && b instanceof Number) {
+                    return Double.compare(((Number) a).doubleValue(), ((Number) b).doubleValue());
+                }
+                return String.valueOf(a).compareToIgnoreCase(String.valueOf(b));
+            }
+        };
+        for (int c = 0; c < cols.length; c++) sorter.setComparator(c, cmp);
+        t.setRowSorter(sorter);
+
         t.getTableHeader().setFont(BOLD);
         t.getTableHeader().setBackground(new Color(0xF9FAFB));
         t.getTableHeader().setPreferredSize(new Dimension(0, 36));
@@ -272,9 +271,10 @@ public class ModernGUI extends JFrame {
         form.add(input, g);
     }
 
-    // ------------------------------------------------------------------ dashboard
+    // dashboard
+
     private JComponent buildDashboard() {
-        JPanel p = page("Dashboard", "A quick look at the current state of the matching system.");
+        JPanel p = page("Dashboard", "Current numbers");
         JPanel body = new JPanel();
         body.setOpaque(false);
         body.setLayout(new BoxLayout(body, BoxLayout.Y_AXIS));
@@ -311,21 +311,6 @@ public class ModernGUI extends JFrame {
         actions.add(quick("Register recipient", "Register Recipient"));
         actions.add(quick("Find a match", "Find Match"));
         body.add(actions);
-        body.add(Box.createVerticalStrut(20));
-
-        JPanel how = card();
-        how.setLayout(new BoxLayout(how, BoxLayout.Y_AXIS));
-        how.setAlignmentX(Component.LEFT_ALIGNMENT);
-        how.add(label("How matching works"));
-        how.add(Box.createVerticalStrut(6));
-        JLabel txt = new JLabel("<html>A recipient is a candidate when blood group and organ are compatible with the donor. "
-                + "Candidates are ranked by urgency first, then by how long they have waited. "
-                + "The coordinator always confirms the final match; the ranking is a suggestion, not a medical decision.</html>");
-        txt.setFont(BASE);
-        txt.setForeground(MUTED);
-        how.add(txt);
-        how.setMaximumSize(new Dimension(Integer.MAX_VALUE, 130));
-        body.add(how);
 
         p.add(body, BorderLayout.CENTER);
         refreshers.put("Dashboard", new Runnable() {
@@ -345,13 +330,14 @@ public class ModernGUI extends JFrame {
         return b;
     }
 
-    // ------------------------------------------------------------------ registration forms
+    // forms
+
     private JComponent buildDonorForm() {
-        JPanel p = page("Register Donor", "Fields marked * are required.");
+        JPanel p = page("Register Donor", "All fields are required. Donors must be 18 to 65.");
         JPanel form = new JPanel(new GridBagLayout());
         form.setOpaque(false);
         final JTextField name = field();
-        final JSpinner age = new JSpinner(new SpinnerNumberModel(30, 18, 80, 1));
+        final JSpinner age = new JSpinner(new SpinnerNumberModel(30, 18, 65, 1));
         age.setFont(BASE);
         final JComboBox<String> bg = combo(backend.bloodGroups());
         final JComboBox<String> organ = combo(backend.organs());
@@ -360,7 +346,7 @@ public class ModernGUI extends JFrame {
         addRow(form, 1, "Age *", age);
         addRow(form, 2, "Blood group *", bg);
         addRow(form, 3, "Organ *", organ);
-        addRow(form, 4, "City", city);
+        addRow(form, 4, "City *", city);
 
         final JButton submit = primary("Register donor");
         JButton clear = secondary("Clear");
@@ -409,7 +395,7 @@ public class ModernGUI extends JFrame {
     }
 
     private JComponent buildRecipientForm() {
-        JPanel p = page("Register Recipient", "Add a patient to the waiting list. Urgency 5 means most urgent.");
+        JPanel p = page("Register Recipient", "All fields are required. Urgency 5 is the most urgent.");
         JPanel form = new JPanel(new GridBagLayout());
         form.setOpaque(false);
         final JTextField name = field();
@@ -425,7 +411,7 @@ public class ModernGUI extends JFrame {
         addRow(form, 2, "Blood group *", bg);
         addRow(form, 3, "Organ needed *", organ);
         addRow(form, 4, "Urgency (1-5) *", urgency);
-        addRow(form, 5, "City", city);
+        addRow(form, 5, "City *", city);
 
         final JButton submit = primary("Add to waiting list");
         JButton clear = secondary("Clear");
@@ -475,9 +461,10 @@ public class ModernGUI extends JFrame {
         return p;
     }
 
-    // ------------------------------------------------------------------ waiting list
+    // waiting list
+
     private JComponent buildWaitingList() {
-        JPanel p = page("Waiting List", "Search by name or city, or filter by organ. Rows are colored by urgency.");
+        JPanel p = page("Waiting List", "Search by name or city, or filter by organ.");
         final JTable t = table(new String[]{"ID", "Name", "Age", "Blood", "Organ", "Urgency", "City", "Days waiting"});
         t.setDefaultRenderer(Object.class, new DefaultTableCellRenderer() {
             public Component getTableCellRendererComponent(JTable tb, Object v, boolean sel, boolean foc, int r, int c) {
@@ -496,9 +483,10 @@ public class ModernGUI extends JFrame {
         t.getColumnModel().getColumn(1).setPreferredWidth(180);
         t.getColumnModel().getColumn(2).setPreferredWidth(50);
         t.getColumnModel().getColumn(3).setPreferredWidth(60);
+        t.getColumnModel().getColumn(7).setPreferredWidth(110);
 
         final JTextField search = field();
-        search.setToolTipText("Type a name or city to filter the list");
+        search.setToolTipText("Name or city");
         final JComboBox<String> organ = combo(new ArrayList<String>());
         organ.addItem("All organs");
         for (String o : backend.organs()) organ.addItem(o);
@@ -548,15 +536,16 @@ public class ModernGUI extends JFrame {
         return p;
     }
 
-    // ------------------------------------------------------------------ find match
+    // find match
+
     private int rankedForDonor = -1;
 
     private JComponent buildFindMatch() {
-        JPanel p = page("Find Match", "1. Choose a donor   2. Find matches   3. Select a recipient and confirm.");
+        JPanel p = page("Find Match", "Pick a donor, find matches, then confirm one.");
         final JComboBox<String> donors = new JComboBox<String>();
         donors.setFont(BASE);
         final List<Integer> donorIds = new ArrayList<Integer>();
-        final JTable t = table(new String[]{"Rank", "ID", "Name", "Blood", "Urgency", "Days waiting", "Score"});
+        final JTable t = table(new String[]{"Rank", "ID", "Name", "Blood", "Urgency", "Days waiting", "City"});
         final JButton find = primary("Find matches");
         final JButton confirm = primary("Confirm selected match");
         confirm.setEnabled(false);
@@ -595,7 +584,7 @@ public class ModernGUI extends JFrame {
             public void actionPerformed(ActionEvent e) {
                 int i = donors.getSelectedIndex();
                 if (i < 0) {
-                    JOptionPane.showMessageDialog(ModernGUI.this, "There are no available donors.", "Find match", JOptionPane.INFORMATION_MESSAGE);
+                    JOptionPane.showMessageDialog(ModernGUI.this, "No available donors.", "Find match", JOptionPane.INFORMATION_MESSAGE);
                     return;
                 }
                 try {
@@ -605,11 +594,11 @@ public class ModernGUI extends JFrame {
                     rankedForDonor = donorId;
                     if (rows.isEmpty()) {
                         confirm.setEnabled(false);
-                        say("No compatible recipient found for donor #" + donorId);
+                        say("No compatible recipient for donor #" + donorId);
                     } else {
                         t.setRowSelectionInterval(0, 0);
                         confirm.setEnabled(true);
-                        say(rows.size() + " candidate(s) found for donor #" + donorId + ". The best match is selected.");
+                        say(rows.size() + " candidate(s) for donor #" + donorId + ", best one selected");
                     }
                 } catch (Exception ex) {
                     JOptionPane.showMessageDialog(ModernGUI.this, ex.getMessage(), "Find match", JOptionPane.WARNING_MESSAGE);
@@ -649,9 +638,10 @@ public class ModernGUI extends JFrame {
         return p;
     }
 
-    // ------------------------------------------------------------------ history
+    // history
+
     private JComponent buildHistory() {
-        JPanel p = page("History", "All confirmed matches.");
+        JPanel p = page("History", "Confirmed matches");
         final JTable t = table(new String[]{"Donor", "Recipient", "Organ", "Date"});
         p.add(scroll(t), BorderLayout.CENTER);
         refreshers.put("History", new Runnable() {
@@ -660,139 +650,138 @@ public class ModernGUI extends JFrame {
         return p;
     }
 
-    // ------------------------------------------------------------------ demo backend (no database)
-    static class DemoBackend implements Backend {
-        private static final List<String> BG = Arrays.asList("O-", "O+", "A-", "A+", "B-", "B+", "AB-", "AB+");
-        private static final List<String> ORGANS = Arrays.asList("Kidney", "Liver", "Heart", "Lung", "Pancreas");
-        private int nextId = 1;
-        private final List<Object[]> donors = new ArrayList<Object[]>();      // id,name,bg,organ,city,available
-        private final List<Object[]> recipients = new ArrayList<Object[]>();  // id,name,age,bg,organ,urgency,city,days,waiting
-        private final List<Object[]> history = new ArrayList<Object[]>();
+    // backend implementation
 
-        DemoBackend() {
-            registerDonorQuiet("Arjun Krishnan", "O-", "Kidney", "Chennai");
-            registerDonorQuiet("Divya Nair", "A+", "Liver", "Kochi");
-            registerDonorQuiet("Karthik Rao", "B+", "Kidney", "Bengaluru");
-            addR("Balaji Murugan", 45, "O+", "Kidney", 5, "Chennai", 120);
-            addR("Sana Iqbal", 38, "A+", "Liver", 4, "Hyderabad", 90);
-            addR("Ravi Shankar", 52, "B+", "Kidney", 3, "Bengaluru", 200);
-            addR("Latha Menon", 29, "AB+", "Kidney", 2, "Kochi", 40);
+    static class ServiceBackend implements Backend {
+        private static final DateTimeFormatter DATE_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
+
+        private final MatchService service = new MatchService();
+        private final DonorDAO donorDAO = new DonorDAO();
+        private final RecipientDAO recipientDAO = new RecipientDAO();
+        private final MatchDAO matchDAO = new MatchDAO();
+
+        static void checkConnection() throws Exception {
+            try (java.sql.Connection con = DBConnection.getConnection()) {
+                con.isValid(2);
+            }
         }
 
-        private void registerDonorQuiet(String n, String bg, String o, String c) {
-            donors.add(new Object[]{nextId++, n, bg, o, c, Boolean.TRUE});
-        }
-        private void addR(String n, int a, String bg, String o, int u, String c, int d) {
-            recipients.add(new Object[]{nextId++, n, a, bg, o, u, c, d, Boolean.TRUE});
-        }
+        public List<String> bloodGroups() { return MatchService.BLOOD_GROUPS; }
 
-        public List<String> bloodGroups() { return BG; }
-        public List<String> organs() { return ORGANS; }
+        public List<String> organs() { return MatchService.ORGANS; }
 
-        public void registerDonor(String name, int age, String bg, String organ, String city) throws Exception {
-            if (name.isEmpty()) throw new Exception("Name must not be empty.");
-            if (age < 18) throw new Exception("Donor must be at least 18 years old.");
-            for (Object[] d : donors)
-                if (d[1].toString().equalsIgnoreCase(name) && d[2].equals(bg) && d[3].equals(organ))
-                    throw new Exception("This donor is already registered.");
-            donors.add(new Object[]{nextId++, name, bg, organ, city, Boolean.TRUE});
+        public void registerDonor(String name, int age, String bloodGroup, String organ, String city) throws Exception {
+            service.registerDonor(name, age, bloodGroup, organ, city);
         }
 
-        public void registerRecipient(String name, int age, String bg, String organ, int urgency, String city) throws Exception {
-            if (name.isEmpty()) throw new Exception("Name must not be empty.");
-            if (urgency < 1 || urgency > 5) throw new Exception("Urgency must be between 1 and 5.");
-            for (Object[] r : recipients)
-                if (r[1].toString().equalsIgnoreCase(name) && r[3].equals(bg) && r[4].equals(organ) && (Boolean) r[8])
-                    throw new Exception("This recipient is already on the waiting list.");
-            recipients.add(new Object[]{nextId++, name, age, bg, organ, urgency, city, 0, Boolean.TRUE});
+        public void registerRecipient(String name, int age, String bloodGroup, String organ,
+                                      int urgency, String city) throws Exception {
+            // service takes city before urgency
+            service.registerRecipient(name, age, bloodGroup, organ, city, urgency);
         }
 
         public List<Object[]> waitingList() {
-            List<Object[]> out = new ArrayList<Object[]>();
-            for (Object[] r : recipients)
-                if ((Boolean) r[8]) out.add(new Object[]{r[0], r[1], r[2], r[3], r[4], r[5], r[6], r[7]});
-            return out;
+            try {
+                List<Object[]> rows = new ArrayList<Object[]>();
+                for (Recipient r : service.getWaitingList(null)) {
+                    rows.add(new Object[]{
+                            r.getRecipientId(), r.getName(), r.getAge(), r.getBloodGroup(),
+                            r.getOrganNeeded(), r.getUrgency(), r.getCity(), MatchService.daysWaiting(r)});
+                }
+                return rows;
+            } catch (Exception e) {
+                throw failure("load the waiting list", e);
+            }
         }
 
         public List<Object[]> availableDonors() {
-            List<Object[]> out = new ArrayList<Object[]>();
-            for (Object[] d : donors)
-                if ((Boolean) d[5]) out.add(new Object[]{d[0], d[1], d[2], d[3], d[4]});
-            return out;
-        }
-
-        private static boolean compatible(String donor, String recipient) {
-            boolean donorNeg = donor.endsWith("-");
-            boolean recipNeg = recipient.endsWith("-");
-            if (donorNeg == false && recipNeg) return false;          // Rh+ cannot give to Rh-
-            String d = donor.substring(0, donor.length() - 1);
-            String r = recipient.substring(0, recipient.length() - 1);
-            if (d.equals("O")) return true;
-            if (r.equals("AB")) return true;
-            return d.equals(r);
-        }
-
-        private Object[] find(List<Object[]> list, int id) {
-            for (Object[] o : list) if ((Integer) o[0] == id) return o;
-            return null;
-        }
-
-        public List<Object[]> findMatches(int donorId) throws Exception {
-            Object[] d = find(donors, donorId);
-            if (d == null) throw new Exception("Donor not found.");
-            List<Object[]> cands = new ArrayList<Object[]>();
-            for (Object[] r : recipients) {
-                if (!(Boolean) r[8] || !r[4].equals(d[3]) || !compatible((String) d[2], (String) r[3])) continue;
-                int score = (Integer) r[5] * 100 + (Integer) r[7];
-                cands.add(new Object[]{0, r[0], r[1], r[3], r[5], r[7], score});
+            try {
+                List<Object[]> rows = new ArrayList<Object[]>();
+                for (Donor d : service.getAvailableDonors()) {
+                    rows.add(new Object[]{d.getDonorId(), d.getName(), d.getBloodGroup(), d.getOrganType(), d.getCity()});
+                }
+                return rows;
+            } catch (Exception e) {
+                throw failure("load the available donors", e);
             }
-            java.util.Collections.sort(cands, new java.util.Comparator<Object[]>() {
-                public int compare(Object[] a, Object[] b) { return (Integer) b[6] - (Integer) a[6]; }
-            });
-            for (int i = 0; i < cands.size(); i++) cands.get(i)[0] = (i == 0) ? "1 (best)" : String.valueOf(i + 1);
-            return cands;
+        }
+
+        // already sorted by the query
+        public List<Object[]> findMatches(int donorId) throws Exception {
+            List<Object[]> rows = new ArrayList<Object[]>();
+            int rank = 1;
+            for (Recipient r : service.findBestMatches(donorId)) {
+                rows.add(new Object[]{
+                        rank == 1 ? "1 (best)" : String.valueOf(rank),
+                        r.getRecipientId(), r.getName(), r.getBloodGroup(),
+                        r.getUrgency(), MatchService.daysWaiting(r), r.getCity()});
+                rank++;
+            }
+            return rows;
         }
 
         public void confirmMatch(int donorId, int recipientId) throws Exception {
-            Object[] d = find(donors, donorId);
-            Object[] r = find(recipients, recipientId);
-            if (d == null || r == null || !(Boolean) d[5] || !(Boolean) r[8]) throw new Exception("Donor or recipient is no longer available.");
-            d[5] = Boolean.FALSE;
-            r[8] = Boolean.FALSE;
-            history.add(new Object[]{d[1], r[1], d[3], new java.text.SimpleDateFormat("yyyy-MM-dd HH:mm").format(new java.util.Date())});
+            service.confirmMatch(donorId, recipientId);
         }
 
-        public List<Object[]> history() { return new ArrayList<Object[]>(history); }
+        public List<Object[]> history() {
+            try {
+                List<Object[]> rows = new ArrayList<Object[]>();
+                for (MatchRecord m : matchDAO.getAllMatches()) {
+                    Donor d = donorDAO.getDonorById(m.getDonorId());
+                    Recipient r = recipientDAO.getRecipientById(m.getRecipientId());
+                    rows.add(new Object[]{
+                            d == null ? "(unknown)" : d.getName(),
+                            r == null ? "(unknown)" : r.getName(),
+                            d == null ? "" : d.getOrganType(),
+                            m.getMatchDate().format(DATE_FORMAT)});
+                }
+                return rows;
+            } catch (Exception e) {
+                throw failure("load the match history", e);
+            }
+        }
 
         public int[] stats() {
-            int ad = availableDonors().size();
-            List<Object[]> w = waitingList();
-            int sum = 0;
-            for (Object[] r : w) sum += (Integer) r[7];
-            return new int[]{ad, w.size(), history.size(), w.isEmpty() ? 0 : sum / w.size()};
+            try {
+                return new int[]{
+                        service.getAvailableDonors().size(),
+                        service.getWaitingList(null).size(),
+                        service.getMatchHistory().size(),
+                        (int) Math.round(service.averageWaitingDays())};
+            } catch (Exception e) {
+                throw failure("load the dashboard numbers", e);
+            }
+        }
+
+        // list methods can't throw checked exceptions, so wrap them
+        private static IllegalStateException failure(String action, Exception e) {
+            return new IllegalStateException("Could not " + action + ": " + e.getMessage(), e);
         }
     }
 
-    // ------------------------------------------------------------------ entry point
     public static void main(String[] args) {
+        Thread.setDefaultUncaughtExceptionHandler(new Thread.UncaughtExceptionHandler() {
+            public void uncaughtException(Thread t, Throwable ex) {
+                ex.printStackTrace();
+                JOptionPane.showMessageDialog(null, ex.getMessage(), "Something went wrong", JOptionPane.ERROR_MESSAGE);
+            }
+        });
+
+        try {
+            ServiceBackend.checkConnection();
+        } catch (Exception ex) {
+            JOptionPane.showMessageDialog(null,
+                    "Cannot connect to the database:\n" + ex.getMessage()
+                  + "\n\nCheck that MySQL is running and the password in config.properties is correct.",
+                    "Database connection failed", JOptionPane.ERROR_MESSAGE);
+            return;
+        }
+
         SwingUtilities.invokeLater(new Runnable() {
             public void run() {
-                Backend b = new DemoBackend();                 // <<< SWITCH BACKEND HERE (e.g. new ServiceBackend())
-                new ModernGUI(b).setVisible(true);
+                new ModernGUI(new ServiceBackend()).setVisible(true);
             }
         });
     }
-
-    /*
-     * Wire-up sketch for your real project. Fill in the calls with your MatchService
-     * method names, convert the results to Object[] rows as described in Backend, then
-     * replace  new DemoBackend()  in main() with  new ServiceBackend().
-     *
-     * static class ServiceBackend implements Backend {
-     *     private final MatchService service = new MatchService();
-     *     public List<String> bloodGroups() { return Arrays.asList(MatchService.BLOOD_GROUPS); }
-     *     public List<String> organs()      { return Arrays.asList(MatchService.ORGANS); }
-     *     ... one method per Backend method, calling service.registerDonor(...), service.findBestMatches(id), etc.
-     * }
-     */
 }
