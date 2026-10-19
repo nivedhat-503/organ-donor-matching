@@ -62,7 +62,10 @@ organ-donor-matching/
 │   ├── MatchRecord.java          model
 │   ├── DonorDAO.java             donor database access
 │   ├── RecipientDAO.java         recipient database access
-│   └── MatchDAO.java             match database access
+│   ├── MatchDAO.java             match database access
+│   ├── TestConnection.java       checks the database connection
+│   ├── TestDonorDAO.java         manual test for DonorDAO
+│   └── TestMatchDAO.java         manual test for MatchDAO
 ├── .gitignore
 ├── config.example.properties     template for database settings
 └── README.md
