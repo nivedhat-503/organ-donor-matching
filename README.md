@@ -1,7 +1,7 @@
 
 # Organ Donor Matching System
 
-A Java application that registers organ donors and recipients, keeps a prioritized waiting list, and suggests the best recipient for each available donor. It has a console menu and a Swing graphical interface, both built on the same service layer.
+A Java application that registers organ donors and recipients, keeps a prioritized waiting list, and suggests the best recipient for each available donor. It has a console menu and a Swing graphical interface.
 
 > ## ⚠️ Disclaimer
 >
