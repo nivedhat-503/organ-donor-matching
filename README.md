@@ -44,14 +44,28 @@ A Java application that registers organ donors and recipients, keeps a prioritiz
 ## Project structure
 
 ```
-src/
-  Main.java        console menu
-  MainGUI.java     Swing graphical interface
-  MatchService     matching and business rules
-  ...DAO classes   database access
-schema.sql         creates the tables
-sample_data.sql    fictional sample records
-config.properties  database connection settings (not committed)
+organ-donor-matching/
+├── .vscode/                      editor settings
+├── lib/
+│   └── mysql-connector-j.jar     MySQL JDBC driver
+├── sql/
+│   ├── schema.sql                creates the tables
+│   └── sample_data.sql           fictional sample records
+├── src/
+│   ├── Main.java                 console menu
+│   ├── MainGUI.java              launches the Swing GUI
+│   ├── ModernGUI.java            Swing interface (sidebar layout)
+│   ├── MatchService.java         matching rules and business logic
+│   ├── DBConnection.java         reads config.properties, opens connections
+│   ├── Donor.java                model
+│   ├── Recipient.java            model
+│   ├── MatchRecord.java          model
+│   ├── DonorDAO.java             donor database access
+│   ├── RecipientDAO.java         recipient database access
+│   └── MatchDAO.java             match database access
+├── .gitignore
+├── config.example.properties     template for database settings
+└── README.md
 ```
 
 ## Setup
