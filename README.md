@@ -37,10 +37,9 @@ A Java application that registers organ donors and recipients, keeps a prioritiz
 
 ## Tech stack
 
-- Java (JDK 17 or later recommended)
-- Swing for the graphical interface
-- MySQL with JDBC for storage
-
+![Java](https://img.shields.io/badge/Java-7986CB?style=for-the-badge&logo=openjdk&logoColor=white)
+![Java Swing](https://img.shields.io/badge/Java_Swing-ED8B00?style=for-the-badge&logo=openjdk&logoColor=white)
+![MySQL](https://img.shields.io/badge/MySQL-29B6F6?style=for-the-badge&logo=mysql&logoColor=white)
 ## Project structure
 
 ```
